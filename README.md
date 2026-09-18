@@ -22,6 +22,43 @@ ingen ytterligare container ovanpå.
 byggmaskinen (för att skapa imagen) och finns redan förinstallerat inuti
 den färdiga Fedora-miljön (för utvecklarens eget containerarbete).
 
+## Förinstallerade AWS-/molnverktyg
+
+Utöver Fedoras grundpaket och Podman innehåller imagen ett komplett
+AWS-verktygskit, redan installerat och verifierat fungerande (senast
+verifierat 2026-09-18):
+
+| Verktyg | Vad det används till |
+|---|---|
+| `terraform` | Infrastructure-as-code (HashiCorp-repot, finns inte i Fedoras egna repon) |
+| `aws` (AWS CLI v2) | Grundläggande AWS-hantering från kommandoraden |
+| `git` + `gh` | Versionshantering + GitHub CLI |
+| `kubectl` + `eksctl` + `helm` | Kubernetes/EKS-hantering och Helm-charts |
+| `sam` (AWS SAM CLI) | Serverless/Lambda-utveckling |
+| `cdk` (AWS CDK) | Infrastructure-as-code i vanlig kod (TypeScript/Python m.fl.) |
+| `tflint` + `tfsec` + `checkov` | Linting och säkerhetsskanning av Terraform-kod |
+| `pre-commit` | Git-hooks för att köra ovanstående automatiskt innan varje commit |
+| `aws-vault` | Krypterad lokal lagring av AWS-nycklar/temporära sessioner, istället för klartext i `~/.aws/credentials` |
+
+De flesta av dessa hämtas från respektive leverantörs "senaste
+version"-kanal vid byggtillfället (GitHub releases/npm/pip), inte ett
+pinnat versionsnummer i `Containerfile.fedora-golden`. Exakt version
+speglar alltså när imagen senast byggdes, inte ett löpande
+uppdateringsflöde - se "Löpande patchning" nedan. Undantaget är
+`kubectl`, som hämtas från en specifik minor-version-kanal
+(`v1.31` i skrivande stund) - byt kanal i Containerfilen om ni kör en
+annan EKS-version.
+
+**Om VS Code:** medvetet INTE inbakat i imagen. VS Code är designat att
+köras på Windows-sidan med tillägget "WSL" installerat - `code`-binären
+upptäcker själv om den körs inuti WSL och vägrar/varnar då ("please
+install Visual Studio Code in Windows... You can then use the `code`
+command in a WSL terminal"). Att baka in den Linux-native `code`-RPM:en
+inuti imagen går alltså rakt emot Microsofts egen rekommendation och
+skulle bara skapa förvirring. Se
+[DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) för hur utvecklaren sätter upp
+VS Code korrekt mot miljön.
+
 ## Filer i det här repot
 
 | Fil | Beskrivning |

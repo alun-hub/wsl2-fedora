@@ -23,16 +23,90 @@ ARG DEV_UID=1000
 
 # --- Baseline-paket ---
 # Justera listan efter teamets standardverktyg. systemd behovs for att
-# [boot] systemd=true i /etc/wsl.conf ska fungera.
+# [boot] systemd=true i /etc/wsl.conf ska fungera. curl/unzip/tar/gzip/
+# openssl ar byggblock som AWS-verktygen nedan behover.
 RUN dnf -y update && \
     dnf -y install \
       sudo passwd systemd systemd-udev \
-      git gcc gcc-c++ make cmake pkgconf-pkg-config \
+      git gh gcc gcc-c++ make cmake pkgconf-pkg-config \
       vim-enhanced tmux which findutils \
+      curl unzip tar gzip openssl \
+      python3-pip nodejs npm \
       dnf-automatic \
       podman \
     && dnf clean all && \
     systemctl enable dnf5-automatic.timer
+
+# --- AWS/molnverktyg ---
+# Dessa hamtas fran respektive leverantors "senaste version"-kanal vid
+# byggtillfallet (GitHub releases / npm / pip), sa exakt version speglar
+# nar imagen senast byggdes - inte ett pinnat versionsnummer i den har
+# filen. Foljer samma ombyggnadspolicy som resten av imagen: uppdateras
+# vid nasta ombyggnad, inte automatiskt i en redan utrullad distro.
+# Utvecklare kan sjalva kora om install-kommandona nedan for att uppdatera
+# ett enskilt verktyg i sin egen miljo mellan ombyggnader.
+
+# Terraform (HashiCorp repo - finns inte i Fedoras egna repon pga licens)
+RUN dnf -y install dnf-plugins-core && \
+    dnf config-manager addrepo --from-repofile=https://rpm.releases.hashicorp.com/fedora/hashicorp.repo && \
+    dnf -y install terraform && \
+    dnf clean all
+
+# AWS CLI v2 (officiell installer - finns inte som RPM)
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip && \
+    unzip -q /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# kubectl (kubernetes.io:s officiella repo). OBS: v1.31 ar en specifik
+# kanal - byt till den minor-version som matchar teamets EKS-kluster vid
+# nasta ombyggnad.
+RUN cat > /etc/yum.repos.d/kubernetes.repo <<'EOF'
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/repodata/repomd.xml.key
+EOF
+RUN dnf -y install kubectl && dnf clean all
+
+# eksctl (EKS-kluster-CLI, officiell GitHub release-binar)
+RUN curl -fsSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" -o /tmp/eksctl.tar.gz && \
+    tar -xzf /tmp/eksctl.tar.gz -C /usr/local/bin eksctl && \
+    rm -f /tmp/eksctl.tar.gz
+
+# helm (Kubernetes package manager, officiellt installscript)
+RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o /tmp/get-helm.sh && \
+    chmod +x /tmp/get-helm.sh && \
+    /tmp/get-helm.sh && \
+    rm -f /tmp/get-helm.sh
+
+# AWS SAM CLI (serverless/Lambda, officiell installer)
+RUN curl -fsSL "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip" -o /tmp/samcli.zip && \
+    unzip -q /tmp/samcli.zip -d /tmp/sam-installation && \
+    /tmp/sam-installation/install && \
+    rm -rf /tmp/samcli.zip /tmp/sam-installation
+
+# AWS CDK (infrastructure-as-code i kod, via npm)
+RUN npm install -g aws-cdk
+
+# tflint (Terraform-linting)
+RUN curl -fsSL "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip" -o /tmp/tflint.zip && \
+    unzip -q /tmp/tflint.zip -d /usr/local/bin && \
+    rm -f /tmp/tflint.zip
+
+# tfsec (Terraform-sakerhetsskanning)
+RUN curl -fsSL "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64" -o /usr/local/bin/tfsec && \
+    chmod +x /usr/local/bin/tfsec
+
+# checkov + pre-commit (ytterligare IaC-sakerhetsskanning + git-hooks)
+RUN pip install --root-user-action=ignore checkov pre-commit
+
+# aws-vault (krypterad lokal lagring av AWS-nycklar/temporara sessioner,
+# istallet for klartext i ~/.aws/credentials)
+RUN curl -fsSL "https://github.com/99designs/aws-vault/releases/latest/download/aws-vault-linux-amd64" -o /usr/local/bin/aws-vault && \
+    chmod +x /usr/local/bin/aws-vault
 
 # --- Devanvandare med sudo (wheel, losenordslost for lokal utveckling) ---
 RUN useradd -m -u ${DEV_UID} -G wheel -s /bin/bash ${DEV_USER} && \

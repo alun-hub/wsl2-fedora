@@ -67,6 +67,26 @@ containrar direkt:
 podman run --rm -it fedora:latest bash
 ```
 
+## AWS-verktyg
+
+Redan förinstallerat, inget extra att göra: `terraform`, `aws` (AWS CLI
+v2), `gh` (GitHub CLI), `kubectl`, `eksctl`, `helm`, `sam` (AWS SAM CLI),
+`cdk` (AWS CDK), `tflint`, `tfsec`, `checkov`, `pre-commit` och
+`aws-vault`.
+
+**Hantera dina AWS-inloggningsuppgifter med `aws-vault`** istället för att
+lägga AWS-nycklar i klartext i `~/.aws/credentials`:
+
+```bash
+aws-vault add mitt-aws-konto
+aws-vault exec mitt-aws-konto -- aws s3 ls
+```
+
+Behöver du en nyare version av ett enskilt verktyg mellan
+imageuppgraderingar kan du köra om samma installationskommando som
+`Containerfile.fedora-golden` använder för det verktyget - se repots
+README.
+
 ## Säkerhetsuppdateringar
 
 Sker automatiskt i bakgrunden via `dnf5-automatic` - du behöver inte
