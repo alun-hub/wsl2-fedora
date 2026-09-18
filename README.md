@@ -53,20 +53,12 @@ kontinuerligt inuti den redan utrullade distrot.
   Åtgärdat via en `[boot] command` i `/etc/wsl.conf` som återapplicerar
   biten på varje boot, oavsett grundorsak.
 
-## Alternativ väg: Distrobox ovanpå Podman (referens)
+## För utvecklaren som ska använda miljön
 
-[README-distrobox-wsl2-podman.md](README-distrobox-wsl2-podman.md) och
-[provision-fedora-box.sh](provision-fedora-box.sh) dokumenterar en
-alternativ uppsättning: `podman machine` + Distrobox ovanpå WSL2, för team
-som redan har ett Distrobox-baserat arbetsflöde på fysiska
-Fedora-arbetsstationer och vill ha exakt samma känsla på Windows.
-
-Denna väg har fler rörliga delar (tre nästlade Linux-lager istället för
-ett) och kräver flera manuella workarounds för cgroup-manager/D-Bus/
-journald-mismatchar mot den minimala `podman-machine-default`-imagen - se
-dokumentet för detaljer. Den gyllene Fedora-WSL2-imagen ovan rekommenderas
-om inte konsistens med ett befintligt Distrobox-arbetsflöde är ett hårt
-krav.
+[DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) - hur man öppnar Fedora-miljön,
+var man ska spara sina filer, GUI-program, Podman, VS Code-integration och
+vanliga frågor. Länka/dela den här filen med utvecklarna, inte den här
+README:n som är riktad mot build-/paketeringsteamet.
 
 ## Licens
 
