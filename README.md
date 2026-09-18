@@ -429,23 +429,40 @@ som gav byggfel innan de åtgärdades:
   används i Fedora-imagen för att tysta en ofarlig varning om att köra
   pip som root). Flaggan utelämnas medvetet i Amazon Linux-imagen -
   varningen skrivs ut men blockerar inget.
-- **`systemctl is-system-running` visar `degraded`, inte `running`**
-  (till skillnad från Fedora-imagen): två kända, ofarliga WSL2+systemd-
-  kvirkar, inte fel i vår image:
-  - `systemd-remount-fs.service` misslyckas med `mount: /: can't find
-    LABEL=/` - WSL2:s virtuella rotfilsystem har ingen filsystem-LABEL
-    att matcha mot, så remount-enheten kan aldrig lyckas. Roten är redan
-    korrekt monterad läs/skriv av WSL innan systemd ens tar över.
-  - `user@1000.service` (per-användar-systemd-sessionen) misslyckas med
-    `Failed to kill control group ...: Input/output error` (exit
-    219/CGROUP) - en dokumenterad WSL2-kernel/cgroup-v2-begränsning kring
-    nästlad cgroup-hantering för user-slices.
-  
-  Inget av detta påverkar systemtjänster som `docker.service` eller
-  `dnf-automatic-install.timer`, som båda är verifierat fungerande - det
-  är bara den valfria per-användar-systemd-sessionen (t.ex. om en
-  utvecklare själv vill definiera egna `systemctl --user`-tjänster) som
-  inte startar rent.
+
+### Allmän WSL2-begränsning (påverkar BÅDA imagerna, inte distro-specifikt)
+
+`systemctl is-system-running` kan visa `degraded` istället för `running`,
+och `wsl -d <namn>` kan skriva ut "Failed to start the systemd user
+session for '<devuser>'. See journalctl for more details." vid start.
+
+Verifierat 2026-09-18 att detta INTE är fedora- eller
+amazonlinux-specifikt - det uppstod på båda imagerna under samma session,
+även efter att ha isolerat en enskild distro och kört en fullständig
+`wsl --shutdown` (som nollställer hela den delade WSL2-VM:en). Två kända
+enheter misslyckas:
+
+- `systemd-remount-fs.service`: `mount: /: can't find LABEL=/` - WSL2:s
+  virtuella rotfilsystem har ingen filsystem-LABEL att matcha mot, så
+  remount-enheten kan aldrig lyckas. Roten är redan korrekt monterad
+  läs/skriv av WSL innan systemd ens tar över.
+- `user@1000.service` (per-användar-systemd-sessionen): misslyckas med
+  `Failed to kill control group ...: Input/output error` (exit
+  219/CGROUP) - en WSL2-kernel/cgroup-v2-begränsning kring nästlad
+  cgroup-hantering för user-slices. Testat mot WSL 2.7.13.0 / kernel
+  6.18.33.2-2.
+
+**Ingetdera påverkar de systemtjänster vi faktiskt beror på** -
+`docker.service`, `podman`, `dnf5-automatic.timer`/
+`dnf-automatic-install.timer` kör alla som system-tjänster (inte via
+per-användar-sessionen) och är verifierat fungerande trots `degraded`.
+Det som INTE fungerar är den valfria per-användar-systemd-sessionen, t.ex.
+om en utvecklare själv vill definiera egna `systemctl --user`-tjänster.
+
+Om meddelandet stör: det går att ignorera säkert. Om ni vill undersöka
+vidare - kontrollera om en nyare WSL-kernel löser det
+(`wsl --update`), då detta är rapporterat som en plattformsbegränsning i
+WSL2 snarare än något som går att fixa i själva imagen.
 
 ## Licens
 
