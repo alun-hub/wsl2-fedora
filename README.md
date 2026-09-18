@@ -110,6 +110,23 @@ skulle bara skapa förvirring. Se
 [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) för hur utvecklaren sätter upp
 VS Code korrekt mot miljön.
 
+## Diagnostik-/CLI-verktyg
+
+Officiella container-baseimages (det vi bygger från, se ovan) är byggda
+för enprocess-containrar och innehåller därför INTE vanliga
+diagnostikverktyg som `ps`, `top`, `pkill`, `pstree`, `lsof`, `dig`,
+`netstat`, `ip`, `tree` eller `jq` - en riktig WSL-miljö med `systemd`
+och flera tjänster igång är dock raka motsatsen till en enprocess-
+container, så avsaknaden är ett gap, inte en avsiktlig begränsning
+(verifierat 2026-09-18 - `ps` gav "command not found" i båda imagerna
+innan detta åtgärdades).
+
+Det finns ingen dnf-grupp som träffsäkert samlar just dessa verktyg -
+Fedoras `system-tools`-grupp innehåller t.ex. VPN-klienter och
+`aircrack-ng`, helt orelaterat. Imagerna installerar därför en
+uttrycklig, verifierad paketlista istället: `procps-ng`, `psmisc`,
+`lsof`, `bind-utils`, `net-tools`, `iproute`, `tree`, `jq`.
+
 ## Filer i det här repot
 
 | Fil | Beskrivning |

@@ -163,11 +163,31 @@ try {
         exit 1
     }
 
+    # /home ar redan aterstallt korrekt vid det har laget (steget ovan) -
+    # allt nedan ar bara en extra sakerhetsatgard for agarskap. Ett fel
+    # har far ALDRIG krascha hela scriptet (upptackt via verklig
+    # scriptkorning 2026-09-18: om utropet skriver nagot till stderr - t.ex.
+    # for att scriptets egen mapp inte ar drvfs-synlig fran maldistrot, eller
+    # av annan anledning - kan $ErrorActionPreference = "Stop" gora att det
+    # forvandlas till en krasch langre upp, trots att den faktiska
+    # dataaterstallningen redan lyckats. Trycker darfor ner till en WARN
+    # oavsett felorsak.
     $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
     $fixScriptWin = Join-Path $scriptDir "fix-home-ownership.sh"
     if (Test-Path $fixScriptWin) {
         $fixScriptWsl = Convert-ToWslPath -WindowsPath $fixScriptWin
-        wsl -d $DistroName -- sudo bash "$fixScriptWsl"
+        $prevEap = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            wsl -d $DistroName -- sudo bash "$fixScriptWsl"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Log "fix-home-ownership.sh gav felkod $LASTEXITCODE - agarskap under /home kan behova rattas manuellt (chown). /home ar redan aterstallt korrekt oavsett - detta paverkar inte sjalva uppgraderingen." "WARN"
+            }
+        } catch {
+            Write-Log "fix-home-ownership.sh kunde inte koras: $($_.Exception.Message) - agarskap under /home kan behova rattas manuellt (chown). /home ar redan aterstallt korrekt oavsett - detta paverkar inte sjalva uppgraderingen." "WARN"
+        } finally {
+            $ErrorActionPreference = $prevEap
+        }
     } else {
         Write-Log "fix-home-ownership.sh hittades inte bredvid scriptet - agarskap under /home kan behova rattas manuellt (chown)." "WARN"
     }

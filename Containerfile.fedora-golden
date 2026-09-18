@@ -32,7 +32,16 @@ ARG DEV_UID=1000
 # glibc-minimal-langpack, och WSL injicerar ofta LANG=en_US.UTF-8 utifran
 # Windows-vardens sprakinstallning, vilket annars ger "bash: warning:
 # setlocale: LC_CTYPE: cannot change locale" vid varje ny session
-# (verifierat 2026-09-18).
+# (verifierat 2026-09-18). procps-ng/psmisc/lsof/bind-utils/net-tools/
+# iproute/tree/jq: vanliga diagnostik-/CLI-verktyg (ps, top, pkill,
+# pstree, lsof, dig, netstat, ip, tree, jq) som INTE finns i Fedoras
+# minimala baseimage - officiella container-baseimages ar byggda for
+# enprocess-containrar och stryper darfor sadana verktyg, men var WSL-
+# miljo ar en fullstandig flerprocess-systemd-miljo dar de forvantas
+# finnas (verifierat 2026-09-18 - "ps: command not found" annars). Det
+# finns ingen dnf-grupp som traffsakert samlar just dessa - Fedoras
+# "system-tools"-grupp innehaller t.ex. VPN-klienter och aircrack-ng,
+# helt orelaterat - darfor en uttrycklig paketlista istallet.
 RUN dnf -y update && \
     dnf -y install \
       sudo passwd systemd systemd-udev \
@@ -40,6 +49,7 @@ RUN dnf -y update && \
       vim-enhanced tmux which findutils \
       curl wget unzip tar gzip openssl \
       glibc-langpack-en \
+      procps-ng psmisc lsof bind-utils net-tools iproute tree jq \
       python3-pip nodejs npm \
       dnf-automatic \
       podman \
