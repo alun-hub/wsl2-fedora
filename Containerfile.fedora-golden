@@ -1,0 +1,83 @@
+# Definierar den "gyllene" Fedora-imagen som exporteras till en WSL2-rootfs-tarball.
+# Byggs centralt (CI/build-maskin), inte per utvecklardator.
+#
+# Bygg:  podman build --build-arg FEDORA_VERSION=41 --build-arg DEV_USER=devuser \
+#          -t fedora-golden:41 -f Containerfile.fedora-golden .
+#
+# OBS: Detta är en ren userland-rootfs för WSL2 - ingen kernel, ingen bootloader.
+# WSL2 tillhandahaller kerneln, imagen behover bara innehalla Fedora-filsystemet.
+
+ARG FEDORA_VERSION=44
+FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION}
+
+ARG DEV_USER=devuser
+ARG DEV_UID=1000
+
+# --- Ombyggnadspolicy ---
+# Denna image byggs om vid Fedora major-version-byten (t.ex. 41 -> 44),
+# inte for varje sakerhetspatch. Lopande patchning mellan ombyggnader sker
+# INUTI den korande distrot via dnf-automatic (installeras nedan), precis
+# som pa teamets fysiska Fedora-arbetsstationer. Anvand
+# upgrade-fedora-wsl.ps1 vid en major-version-uppgradering - den bevarar
+# /home genom uppgraderingen.
+
+# --- Baseline-paket ---
+# Justera listan efter teamets standardverktyg. systemd behovs for att
+# [boot] systemd=true i /etc/wsl.conf ska fungera.
+RUN dnf -y update && \
+    dnf -y install \
+      sudo passwd systemd systemd-udev \
+      git gcc gcc-c++ make cmake pkgconf-pkg-config \
+      vim-enhanced tmux which findutils \
+      dnf-automatic \
+      podman \
+    && dnf clean all && \
+    systemctl enable dnf5-automatic.timer
+
+# --- Devanvandare med sudo (wheel, losenordslost for lokal utveckling) ---
+RUN useradd -m -u ${DEV_UID} -G wheel -s /bin/bash ${DEV_USER} && \
+    echo "%wheel ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/wheel-nopasswd && \
+    chmod 0440 /etc/sudoers.d/wheel-nopasswd
+
+# --- WSL-specifik konfiguration ---
+# systemd=true ger en RIKTIG systemd/dbus-session (till skillnad fran
+# podman-machine-defaults minimala bootstrap-wrapper) - ingen cgroup-manager-
+# eller sd-bus-workaround behovs har.
+#
+# KAND PROBLEM (verifierat 2026-09-18): newuidmap/newgidmap forlorar sin
+# setuid-bit nar de installeras under ett rootless `podman build` - RPM:ets
+# %post-scriptlet som satter setuid-root lyckas inte i den kontexten. Utan
+# setuid kan rootless podman inte skapa user-namespace-mappningar
+# ("cannot set up namespace using newuidmap: should have setuid").
+# Fix: samma monster som /run/user/1000-workarounden for podman-machine -
+# ateranvand setuid-biten pa varje boot via [boot] command, oberoende av
+# VARFOR den forsvann i grundavbildningen.
+RUN { \
+      echo '[boot]'; \
+      echo 'systemd=true'; \
+      echo 'command = "chmod u+s /usr/bin/newuidmap /usr/bin/newgidmap"'; \
+      echo; \
+      echo '[user]'; \
+      echo "default=${DEV_USER}"; \
+      echo; \
+      echo '[network]'; \
+      echo 'generateResolvConf = true'; \
+    } > /etc/wsl.conf
+
+# --- Enterprise-anpassning (fyll pa vid behov) ---
+# Exempel: interna CA-cert for dnf/tls bakom foretagsproxy.
+# COPY certs/corp-ca.crt /etc/pki/ca-trust/source/anchors/
+# RUN update-ca-trust
+#
+# Exempel: internt dnf-repo istallet for/utover Fedoras officiella speglar.
+# COPY dnf-repos/internal.repo /etc/yum.repos.d/internal.repo
+
+# --- GUI-miljovariabler (WSLg) i devanvandarens shell ---
+RUN { \
+      echo 'export DISPLAY=:0'; \
+      echo 'export WAYLAND_DISPLAY=wayland-0'; \
+      echo 'export XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir'; \
+      echo 'export PULSE_SERVER=/mnt/wslg/PulseServer'; \
+    } >> /home/${DEV_USER}/.bashrc
+
+CMD ["/bin/bash"]
