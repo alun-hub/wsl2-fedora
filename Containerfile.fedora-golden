@@ -24,13 +24,16 @@ ARG DEV_UID=1000
 # --- Baseline-paket ---
 # Justera listan efter teamets standardverktyg. systemd behovs for att
 # [boot] systemd=true i /etc/wsl.conf ska fungera. curl/unzip/tar/gzip/
-# openssl ar byggblock som AWS-verktygen nedan behover.
+# openssl ar byggblock som AWS-verktygen nedan behover. wget kravs av
+# VS Code Remote-WSL for att hamta VS Code Server-komponenten vid forsta
+# `code .` - utan den: "Failed to download the VS Code server. 'wget'
+# not installed" (verifierat 2026-09-18).
 RUN dnf -y update && \
     dnf -y install \
       sudo passwd systemd systemd-udev \
       git gh gcc gcc-c++ make cmake pkgconf-pkg-config \
       vim-enhanced tmux which findutils \
-      curl unzip tar gzip openssl \
+      curl wget unzip tar gzip openssl \
       python3-pip nodejs npm \
       dnf-automatic \
       podman \
