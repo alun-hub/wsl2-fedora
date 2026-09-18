@@ -216,6 +216,9 @@ Körs av paketeringsteamet, en gång per dator.
   tillgängliga, t.ex. via en fileshare.
 - Du har `deploy-fedora-wsl.ps1` från det här repot tillgängligt på
   datorn.
+- **Rekommenderas:** kör `wsl --update` en gång på datorn (fungerar utan
+  Microsoft Store, uppdaterar bara WSL-plattformen). Löser en känd
+  `degraded`-systemd-varning i Fedora-imagen, se "Kända problem" nedan.
 
 ### Kör installationen
 
@@ -435,39 +438,44 @@ som gav byggfel innan de åtgärdades:
   pip som root). Flaggan utelämnas medvetet i Amazon Linux-imagen -
   varningen skrivs ut men blockerar inget.
 
-### Allmän WSL2-begränsning (påverkar BÅDA imagerna, inte distro-specifikt)
+### Allmän WSL2-begränsning - `wsl --update` löser den för Fedora, inte (ännu) för Amazon Linux
 
 `systemctl is-system-running` kan visa `degraded` istället för `running`,
 och `wsl -d <namn>` kan skriva ut "Failed to start the systemd user
 session for '<devuser>'. See journalctl for more details." vid start.
+Orsak: `user@1000.service` (per-användar-systemd-sessionen) misslyckas
+med `Failed to kill control group ...: Input/output error` (exit
+219/CGROUP) - en WSL2-plattformsbegränsning kring cgroup-hantering, inte
+ett fel i imagen (`systemd-remount-fs.service` kan också visas som
+failed samtidigt - `mount: /: can't find LABEL=/` - helt ofarligt, WSL2:s
+virtuella rotfilsystem har ingen LABEL att matcha mot).
 
-Verifierat 2026-09-18 att detta INTE är fedora- eller
-amazonlinux-specifikt - det uppstod på båda imagerna under samma session,
-även efter att ha isolerat en enskild distro och kört en fullständig
-`wsl --shutdown` (som nollställer hela den delade WSL2-VM:en). Två kända
-enheter misslyckas:
+**Uppdaterad 2026-09-18: `wsl --update` (kör på Windows-sidan, uppdaterar
+hela WSL-plattformen - INTE kopplat till Microsoft Store, fungerar även
+på dessa Store-fria enterprise-datorer) löste problemet helt för
+FedoraDev**, bekräftat stabilt över flera omstarter och en full
+`wsl --shutdown`. WSL-versionen gick från 2.7.13.0 till 2.7.14.0 (samma
+kernelversion, 6.18.33.2-2 - fixen satt alltså i WSL-plattformslagret,
+inte kerneln).
 
-- `systemd-remount-fs.service`: `mount: /: can't find LABEL=/` - WSL2:s
-  virtuella rotfilsystem har ingen filsystem-LABEL att matcha mot, så
-  remount-enheten kan aldrig lyckas. Roten är redan korrekt monterad
-  läs/skriv av WSL innan systemd ens tar över.
-- `user@1000.service` (per-användar-systemd-sessionen): misslyckas med
-  `Failed to kill control group ...: Input/output error` (exit
-  219/CGROUP) - en WSL2-kernel/cgroup-v2-begränsning kring nästlad
-  cgroup-hantering för user-slices. Testat mot WSL 2.7.13.0 / kernel
-  6.18.33.2-2.
+**AmazonLinuxDev visar fortfarande problemet efter samma uppdatering.**
+Skillnaden verkar vara systemd-versionen: Fedora-imagen kör systemd
+259.9, Amazon Linux 2023 kör den äldre 252.23 - och AL2023 pinnar den
+versionen för hela OS-livscykeln (`dnf list --showduplicates systemd`
+visar bara patch-releaser av 252.23, ingen väg till en nyare
+major-version via dnf). Detta är alltså sannolikt en samverkan mellan
+WSL:s cgroup-delegering och den äldre systemd-versionen, inte något vi
+kan fixa i `Containerfile.amazonlinux-golden`.
 
-**Ingetdera påverkar de systemtjänster vi faktiskt beror på** -
-`docker.service`, `podman`, `dnf5-automatic.timer`/
-`dnf-automatic-install.timer` kör alla som system-tjänster (inte via
-per-användar-sessionen) och är verifierat fungerande trots `degraded`.
-Det som INTE fungerar är den valfria per-användar-systemd-sessionen, t.ex.
-om en utvecklare själv vill definiera egna `systemctl --user`-tjänster.
-
-Om meddelandet stör: det går att ignorera säkert. Om ni vill undersöka
-vidare - kontrollera om en nyare WSL-kernel löser det
-(`wsl --update`), då detta är rapporterat som en plattformsbegränsning i
-WSL2 snarare än något som går att fixa i själva imagen.
+**Rekommendation:** kör `wsl --update` som en del av grundinstallationen
+på varje dator (t.ex. innan `deploy-fedora-wsl.ps1` körs) - det är en
+engångsåtgärd på Windows-sidan, inte något som behöver bakas in i
+imagerna. Löser problemet helt för Fedora-imagen. För Amazon Linux-imagen
+kvarstår det tills antingen WSL eller Amazon Linux patchar sin sida -
+**ingetdera påverkar de systemtjänster vi faktiskt beror på**
+(`docker.service`, `podman`, `dnf5-automatic.timer`/
+`dnf-automatic-install.timer` kör alla som systemtjänster, inte via
+per-användar-sessionen, och är verifierat fungerande trots `degraded`).
 
 ## Licens
 
