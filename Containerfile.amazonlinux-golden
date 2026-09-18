@@ -1,0 +1,171 @@
+# Definierar den "gyllene" Amazon Linux-imagen som exporteras till en
+# WSL2-rootfs-tarball. Byggs centralt (CI/build-maskin), inte per
+# utvecklardator. Systervariant till Containerfile.fedora-golden - samma
+# struktur, men med Amazon Linux 2023-specifika skillnader (se kommentarer
+# nedan). Verifierat 2026-09-18.
+#
+# Bygg:  podman build --build-arg AL_VERSION=2023 --build-arg DEV_USER=devuser \
+#          -t amazonlinux-golden:2023 -f Containerfile.amazonlinux-golden .
+#
+# OBS: Detta ar en ren userland-rootfs for WSL2 - ingen kernel, ingen
+# bootloader. WSL2 tillhandahaller kerneln, imagen behover bara
+# innehalla Amazon Linux-filsystemet.
+
+ARG AL_VERSION=2023
+FROM public.ecr.aws/amazonlinux/amazonlinux:${AL_VERSION}
+
+ARG DEV_USER=devuser
+ARG DEV_UID=1000
+
+# --- Ombyggnadspolicy ---
+# Samma som Fedora-imagen: byggs om vid Amazon Linux major-version-byten,
+# inte for varje sakerhetspatch. Lopande patchning mellan ombyggnader sker
+# INUTI den korande distrot via dnf-automatic (installeras nedan). Anvand
+# upgrade-fedora-wsl.ps1 (fungerar distro-agnostiskt, se README) vid en
+# major-version-uppgradering - den bevarar /home genom uppgraderingen.
+
+# --- Baseline-paket ---
+# Skillnader mot Fedora-imagen:
+#  - INGEN explicit "curl": Amazon Linux 2023s baseimage har redan
+#    curl-minimal forinstallerat, och ett explicit "curl"-paket
+#    KROCKAR med curl-minimal (dnf vagrar installera bada). curl-minimal
+#    racker for alla https-nedladdningar i den har filen.
+#  - "shadow-utils" maste anges explicit - till skillnad fran Fedoras
+#    baseimage saknar AL2023s baseimage useradd/groupadd/usermod
+#    (anvands langre ner for devanvandaren och docker-gruppen).
+#  - systemd ar INTE forinstallerat i AL2023s baseimage (Fedoras ar det
+#    indirekt via andra paket) - maste anges explicit har.
+RUN dnf -y update && \
+    dnf -y install \
+      sudo passwd shadow-utils systemd systemd-udev \
+      git gcc gcc-c++ make cmake pkgconf-pkg-config \
+      vim-enhanced tmux which findutils \
+      wget unzip tar gzip openssl \
+      python3-pip nodejs npm \
+      dnf-automatic dnf-plugins-core \
+      docker \
+    && dnf clean all && \
+    systemctl enable docker.service && \
+    systemctl enable dnf-automatic-install.timer
+
+# --- AWS/molnverktyg ---
+# Samma verktyg och samma "senaste version vid byggtillfallet"-princip
+# som i Fedora-imagen - se motsvarande kommentar i
+# Containerfile.fedora-golden for detaljer kring uppdateringspolicy.
+
+# gh (GitHub CLI) - finns INTE i AL2023s egna repon (till skillnad fran
+# Fedora dar det gor det) - lagg till GitHubs officiella repo forst.
+RUN dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
+    dnf -y install gh && \
+    dnf clean all
+
+# Terraform (HashiCorp repo - AmazonLinux-specifik sokvag, skiljer sig
+# fran Fedora-sokvagen)
+RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo && \
+    dnf -y install terraform && \
+    dnf clean all
+
+# AWS CLI v2 (officiell installer - identisk pa alla distros)
+RUN curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip && \
+    unzip -q /tmp/awscliv2.zip -d /tmp && \
+    /tmp/aws/install && \
+    rm -rf /tmp/awscliv2.zip /tmp/aws
+
+# kubectl (kubernetes.io:s officiella repo). OBS: v1.31 ar en specifik
+# kanal - byt till den minor-version som matchar teamets EKS-kluster vid
+# nasta ombyggnad.
+RUN cat > /etc/yum.repos.d/kubernetes.repo <<'EOF'
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/repodata/repomd.xml.key
+EOF
+RUN dnf -y install kubectl && dnf clean all
+
+# eksctl (EKS-kluster-CLI, officiell GitHub release-binar)
+RUN curl -fsSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" -o /tmp/eksctl.tar.gz && \
+    tar -xzf /tmp/eksctl.tar.gz -C /usr/local/bin eksctl && \
+    rm -f /tmp/eksctl.tar.gz
+
+# helm (Kubernetes package manager, officiellt installscript)
+RUN curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 -o /tmp/get-helm.sh && \
+    chmod +x /tmp/get-helm.sh && \
+    /tmp/get-helm.sh && \
+    rm -f /tmp/get-helm.sh
+
+# AWS SAM CLI (serverless/Lambda, officiell installer)
+RUN curl -fsSL "https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip" -o /tmp/samcli.zip && \
+    unzip -q /tmp/samcli.zip -d /tmp/sam-installation && \
+    /tmp/sam-installation/install && \
+    rm -rf /tmp/samcli.zip /tmp/sam-installation
+
+# AWS CDK (infrastructure-as-code i kod, via npm)
+RUN npm install -g aws-cdk
+
+# tflint (Terraform-linting)
+RUN curl -fsSL "https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip" -o /tmp/tflint.zip && \
+    unzip -q /tmp/tflint.zip -d /usr/local/bin && \
+    rm -f /tmp/tflint.zip
+
+# tfsec (Terraform-sakerhetsskanning)
+RUN curl -fsSL "https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64" -o /usr/local/bin/tfsec && \
+    chmod +x /usr/local/bin/tfsec
+
+# checkov + pre-commit (ytterligare IaC-sakerhetsskanning + git-hooks).
+# OBS: AL2023s pip (21.3.1) ar for gammal for flaggan
+# --root-user-action=ignore som anvands i Fedora-imagen - den flaggan
+# UTELAMNAS har medvetet (pip skriver bara en ofarlig varning om att kora
+# som root istallet).
+RUN pip install checkov pre-commit
+
+# aws-vault (krypterad lokal lagring av AWS-nycklar/temporara sessioner,
+# istallet for klartext i ~/.aws/credentials)
+RUN curl -fsSL "https://github.com/99designs/aws-vault/releases/latest/download/aws-vault-linux-amd64" -o /usr/local/bin/aws-vault && \
+    chmod +x /usr/local/bin/aws-vault
+
+# --- Devanvandare med sudo (wheel, losenordslost for lokal utveckling) ---
+# Skillnad mot Fedora: laggs aven till i gruppen "docker" har, eftersom
+# Amazon Linux anvander Docker (root-daemon-modell) istallet for Podman
+# (rootless). Ingen setuid/newuidmap-fix behovs har - det var specifikt
+# ett rootless-podman-problem pa Fedora-imagen, docker-gruppmedlemskap ar
+# vanliga Unix-filrattigheter som overlever export/import utan vidare.
+RUN useradd -m -u ${DEV_UID} -G wheel,docker -s /bin/bash ${DEV_USER} && \
+    echo "%wheel ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/wheel-nopasswd && \
+    chmod 0440 /etc/sudoers.d/wheel-nopasswd
+
+# --- WSL-specifik konfiguration ---
+# systemd=true ger en RIKTIG systemd/dbus-session, vilket racker for att
+# bade dnf-automatic-install.timer och docker.service (aktiverade ovan)
+# ska starta korrekt vid boot - ingen extra [boot] command behovs har,
+# till skillnad fran Fedora-imagens setuid-fix.
+RUN { \
+      echo '[boot]'; \
+      echo 'systemd=true'; \
+      echo; \
+      echo '[user]'; \
+      echo "default=${DEV_USER}"; \
+      echo; \
+      echo '[network]'; \
+      echo 'generateResolvConf = true'; \
+    } > /etc/wsl.conf
+
+# --- Enterprise-anpassning (fyll pa vid behov) ---
+# Exempel: interna CA-cert for dnf/tls bakom foretagsproxy.
+# COPY certs/corp-ca.crt /etc/pki/ca-trust/source/anchors/
+# RUN update-ca-trust
+#
+# Exempel: internt dnf-repo istallet for/utover Amazon Linux officiella
+# speglar.
+# COPY dnf-repos/internal.repo /etc/yum.repos.d/internal.repo
+
+# --- GUI-miljovariabler (WSLg) i devanvandarens shell ---
+RUN { \
+      echo 'export DISPLAY=:0'; \
+      echo 'export WAYLAND_DISPLAY=wayland-0'; \
+      echo 'export XDG_RUNTIME_DIR=/mnt/wslg/runtime-dir'; \
+      echo 'export PULSE_SERVER=/mnt/wslg/PulseServer'; \
+    } >> /home/${DEV_USER}/.bashrc
+
+CMD ["/bin/bash"]
