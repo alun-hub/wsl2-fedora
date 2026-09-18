@@ -1,8 +1,8 @@
 # Definierar den "gyllene" Fedora-imagen som exporteras till en WSL2-rootfs-tarball.
 # Byggs centralt (CI/build-maskin), inte per utvecklardator.
 #
-# Bygg:  podman build --build-arg FEDORA_VERSION=41 --build-arg DEV_USER=devuser \
-#          -t fedora-golden:41 -f Containerfile.fedora-golden .
+# Bygg:  podman build --build-arg FEDORA_VERSION=44 --build-arg DEV_USER=devuser \
+#          -t fedora-golden:44 -f Containerfile.fedora-golden .
 #
 # OBS: Detta är en ren userland-rootfs för WSL2 - ingen kernel, ingen bootloader.
 # WSL2 tillhandahaller kerneln, imagen behover bara innehalla Fedora-filsystemet.

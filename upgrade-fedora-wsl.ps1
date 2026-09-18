@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-  Uppgraderar en befintlig Fedora-WSL-distro till en ny gyllene image UTAN
-  att forlora /home. Anvands vid Fedora major-version-byten (t.ex. 41 -> 44).
+  Uppgraderar en befintlig WSL-distro (Fedora- eller Amazon Linux-baserad,
+  distro-agnostiskt) till en ny gyllene image UTAN att forlora /home.
+  Anvands vid major-version-byten (t.ex. Fedora 41 -> 44).
 
 .DESCRIPTION
   Lopande sakerhetspatchar mellan majorversioner tacks av dnf-automatic
-  INUTI den korande distrot (aktiverat i Containerfile.fedora-golden) - det
+  INUTI den korande distrot (aktiverat i respektive Containerfile) - det
   har scriptet ar bara for de mer sallsynta major-version-bytena, dar
   imagen byggs om fran grunden.
 

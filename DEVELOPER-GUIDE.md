@@ -34,7 +34,7 @@ Windows-disk sedd från Linux-sidan - den funkar, men är betydligt
 långsammare för saker som `git`, kompilering och paketbyggen eftersom
 filsystemet går via en Windows-brygga. Din hemkatalog ligger på ett
 riktigt Linux-filsystem inuti WSL2 och är lika snabb som på en fysisk
-Fedora-maskin.
+Linux-maskin.
 
 Om du behöver komma åt en fil från Windows-sidan (t.ex. dra in den i ett
 Windows-program) hittar du din Linux-hemkatalog på:
@@ -46,7 +46,7 @@ Windows-program) hittar du din Linux-hemkatalog på:
 
 ## Installera paket
 
-Vanlig Fedora, vanlig `dnf`:
+Vanlig `dnf` (samma kommando i båda imagerna):
 
 ```bash
 sudo dnf install <paketnamn>
@@ -59,9 +59,15 @@ grafiskt program och kör det, så dyker fönstret upp på ditt
 Windows-skrivbord precis som vilket Windows-program som helst:
 
 ```bash
-sudo dnf install gimp
-gimp
+sudo dnf install xterm
+xterm
 ```
+
+(Paketutbudet skiljer sig något mellan Fedora och Amazon Linux - Amazon
+Linux 2023 är en serverfokuserad distro och saknar t.ex. `gimp` i sina
+repon. `xterm` ovan finns i båda som ett minimalt exempel; större
+GUI-program kan behöva sökas upp separat beroende på vilken image du
+har.)
 
 ## Containrar (Podman eller Docker)
 

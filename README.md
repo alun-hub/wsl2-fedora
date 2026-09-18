@@ -307,11 +307,12 @@ Skicka [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md) till utvecklaren.
 
 ---
 
-## Steg 3: Uppgradera en befintlig installation (vid Fedora major-version-byte)
+## Steg 3: Uppgradera en befintlig installation (vid major-version-byte)
 
-Körs av paketeringsteamet när en ny gyllene image (t.ex. Fedora 45) har
-byggts enligt Steg 1, och datorn redan har en fungerande installation från
-Steg 2 vars data INTE ska förloras.
+Körs av paketeringsteamet när en ny gyllene image (t.ex. Fedora 45 eller
+en nyare Amazon Linux-version) har byggts enligt Steg 1, och datorn redan
+har en fungerande installation från Steg 2 vars data INTE ska förloras.
+Fungerar för båda imagevarianterna (samma skript, distro-agnostiskt).
 
 **Kör inte Steg 2 med `-Force` för detta - det bevarar inte `/home`.**
 Använd istället:

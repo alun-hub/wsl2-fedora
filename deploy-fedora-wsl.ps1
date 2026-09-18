@@ -43,7 +43,7 @@
 
 .EXAMPLE
   .\deploy-fedora-wsl.ps1 -MsiPath \\fileshare\wsl\Wsl.msi `
-    -ImagePath \\fileshare\wsl\fedora-golden-41-2026.09.18.tar
+    -ImagePath \\fileshare\wsl\fedora-golden-44-2026.09.18.tar
 #>
 
 [CmdletBinding()]
