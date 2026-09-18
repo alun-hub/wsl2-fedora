@@ -251,6 +251,7 @@ Alla parametrar:
 | `-DistroName` | Nej | `FedoraDev` | Namnet WSL-distrot får - sätt t.ex. till `AmazonLinuxDev` för Amazon Linux-imagen |
 | `-InstallLocation` | Nej | `C:\WSL\FedoraDev` | Var distrots VHDX-fil lagras |
 | `-Force` | Nej | Av | Tar bort och återskapar distrot om den redan finns - **all data i distrot förloras, se varning nedan** |
+| `-SkipSetDefault` | Nej | Av | Sätt INTE distrot som WSL:s default - utan flaggan blir `$DistroName` automatiskt det `wsl` (utan `-d`) öppnar |
 
 ### Vad skriptet gör, steg för steg
 
@@ -267,7 +268,11 @@ Alla parametrar:
 5. Importerar imagen som en ny WSL-distro till `-InstallLocation`.
 6. Startar distrot en första gång och kör `systemctl is-system-running`
    för att verifiera att `systemd` faktiskt kom upp korrekt.
-7. Skriver en logg till `C:\ProgramData\FedoraWSLDeploy\deploy-<tidsstämpel>.log`.
+7. Sätter distrot som WSL:s default (`wsl --set-default`), om inte
+   `-SkipSetDefault` angetts - så `wsl` utan `-d` öppnar rätt miljö direkt
+   istället för en eventuell förinstallerad Ubuntu från en tidigare
+   `wsl --install`.
+8. Skriver en logg till `C:\ProgramData\FedoraWSLDeploy\deploy-<tidsstämpel>.log`.
 
 ### Förväntat resultat
 

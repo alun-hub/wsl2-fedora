@@ -27,13 +27,19 @@ ARG DEV_UID=1000
 # openssl ar byggblock som AWS-verktygen nedan behover. wget kravs av
 # VS Code Remote-WSL for att hamta VS Code Server-komponenten vid forsta
 # `code .` - utan den: "Failed to download the VS Code server. 'wget'
-# not installed" (verifierat 2026-09-18).
+# not installed" (verifierat 2026-09-18). glibc-langpack-en kravs for att
+# en_US.UTF-8 ska finnas - Fedoras minimala baseimage har bara
+# glibc-minimal-langpack, och WSL injicerar ofta LANG=en_US.UTF-8 utifran
+# Windows-vardens sprakinstallning, vilket annars ger "bash: warning:
+# setlocale: LC_CTYPE: cannot change locale" vid varje ny session
+# (verifierat 2026-09-18).
 RUN dnf -y update && \
     dnf -y install \
       sudo passwd systemd systemd-udev \
       git gh gcc gcc-c++ make cmake pkgconf-pkg-config \
       vim-enhanced tmux which findutils \
       curl wget unzip tar gzip openssl \
+      glibc-langpack-en \
       python3-pip nodejs npm \
       dnf-automatic \
       podman \

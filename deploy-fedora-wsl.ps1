@@ -34,6 +34,13 @@
 .PARAMETER Force
   Tar bort och importerar om distrot aven om det redan finns.
 
+.PARAMETER SkipSetDefault
+  Satt INTE distrot som WSL:s default. Utan denna flagga blir $DistroName
+  automatiskt det bare `wsl` (utan -d) oppnar - anvandbart nar en dator
+  bara ska ha en dev-distro. Anvand -SkipSetDefault om datorn ska ha
+  flera parallella distros och ni inte vill att den har korningen andrar
+  vilken som ar default.
+
 .EXAMPLE
   .\deploy-fedora-wsl.ps1 -MsiPath \\fileshare\wsl\Wsl.msi `
     -ImagePath \\fileshare\wsl\fedora-golden-41-2026.09.18.tar
@@ -47,7 +54,8 @@ param(
     [string]$ChecksumPath,
     [string]$DistroName = "FedoraDev",
     [string]$InstallLocation = "C:\WSL\FedoraDev",
-    [switch]$Force
+    [switch]$Force,
+    [switch]$SkipSetDefault
 )
 
 $ErrorActionPreference = "Stop"
@@ -168,6 +176,16 @@ try {
         Write-Log "Systemd rapporterar ovantat tillstand ('$status'). Kontrollera imagen manuellt." "WARN"
     } else {
         Write-Log "Systemd OK ('$status')."
+    }
+
+    if (-not $SkipSetDefault) {
+        Write-Log "== Steg 6: Satt '$DistroName' som WSL-default =="
+        wsl --set-default $DistroName | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Log "Kunde inte satta '$DistroName' som default (exitkod $LASTEXITCODE) - fortsatter anda, distrot fungerar fortfarande via -d." "WARN"
+        } else {
+            Write-Log "'$DistroName' ar nu WSL-default - 'wsl' utan -d oppnar den direkt."
+        }
     }
 
     Write-Log "== Klart: '$DistroName' ar redo. Utvecklaren startar med: wsl -d $DistroName =="

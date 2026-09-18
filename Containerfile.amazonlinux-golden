@@ -35,12 +35,15 @@ ARG DEV_UID=1000
 #    (anvands langre ner for devanvandaren och docker-gruppen).
 #  - systemd ar INTE forinstallerat i AL2023s baseimage (Fedoras ar det
 #    indirekt via andra paket) - maste anges explicit har.
+#  - glibc-langpack-en kravs for att en_US.UTF-8 ska finnas (samma
+#    problem och fix som i Fedora-imagen - se motsvarande kommentar dar).
 RUN dnf -y update && \
     dnf -y install \
       sudo passwd shadow-utils systemd systemd-udev \
       git gcc gcc-c++ make cmake pkgconf-pkg-config \
       vim-enhanced tmux which findutils \
       wget unzip tar gzip openssl \
+      glibc-langpack-en \
       python3-pip nodejs npm \
       dnf-automatic dnf-plugins-core \
       docker \
